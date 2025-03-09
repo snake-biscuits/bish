@@ -11,6 +11,10 @@ class DXBC:
     # ^ {"RDEF": RDEF(...), "SHEX": b"..."}
 
     @classmethod
+    def from_bytes(cls, raw_data: bytes) -> DXBC:
+        return cls.from_stream(io.BytesIO(raw_data))
+
+    @classmethod
     def from_file(cls, filename: str) -> DXBC:
         with open(filename, "rb") as stream:
             return cls.from_stream(stream)
