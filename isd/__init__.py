@@ -1,4 +1,9 @@
-__all__ = ["dxbc", "DXBC"]
+__all__ = [
+    "dxbc", "utils",
+    "DXBC"]
+
 
 from . import dxbc
+from . import utils
+
 from .dxbc import DXBC
