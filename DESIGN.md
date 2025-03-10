@@ -24,6 +24,12 @@
    - understanding > machine translation
 
 
+## General HLSL notes
+
+> TODO: copy notes from `~/drives/ssd1/Mod/_tools/HLSL`
+> -- cite your sources!
+
+
 ## Scope
 track each time a register-swizzle appears
 
