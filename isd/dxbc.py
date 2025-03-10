@@ -1,14 +1,20 @@
 from __future__ import annotations
 import io
 import struct
-from typing import Dict, Union
+from typing import Dict, Tuple
+
+from .utils.binary import read_struct
 
 
 class DXBC:
     checksum: bytes
     filesize: int
-    chunks: Dict[str, Union[bytes, Any]]
-    # ^ {"RDEF": RDEF(...), "SHEX": b"..."}
+    chunks: Dict[str, Tuple[int, int]]
+    # ^ {"id": (offset, length)}
+
+    def __repr__(self) -> str:
+        descriptor = f"{len(self.chunks)} chunks {self.filesize} bytes"
+        return f"<{self.__class__.__name__} {descriptor} @ 0x{id(self):016X}>"
 
     @classmethod
     def from_bytes(cls, raw_data: bytes) -> DXBC:
@@ -22,7 +28,7 @@ class DXBC:
     @classmethod
     def from_stream(cls, stream: io.BytesIO) -> DXBC:
         out = cls()
-        header = struct.unpack("4s16s3I", stream.read(32))
+        header = read_struct(stream, "4s16s3I")
         magic, checksum, one, filesize, num_chunks = header
         assert magic == b"DXBC"
         out.checksum = checksum
@@ -32,13 +38,17 @@ class DXBC:
         out.chunks = dict()
         for offset in chunk_offsets:
             stream.seek(offset)
-            chunk_id, chunk_size = struct.unpack("4sI", stream.read(8))
-            chunk_id = chunk_id.decode("ascii", "strict")
-            assert chunk_size < filesize
+            assert stream.tell() == offset
+            name, length = read_struct(stream, "4sI")
+            name = name.decode("ascii", "strict")
+            out.chunks[name] = (offset, length)
+            assert length < filesize
             assert not any(
-                offset < other_offset < offset + chunk_size
+                offset < other_offset < offset + length
                 for other_offset in chunk_offsets)
-            chunk_data = stream.read(chunk_size)
+            data = stream.read(length)
+            assert len(data) == length
             # TODO: convert data from bytes
-            out.chunks[chunk_id] = chunk_data
+            setattr(out, name, data)
+        # NOTE: we're closing the stream now, hope we got everything!
         return out
