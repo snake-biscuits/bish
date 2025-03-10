@@ -1,8 +1,11 @@
+"""Bikkie's Interactive Shader tool"""
 __all__ = [
-    "dxbc", "utils",
+    "asm", "chunks", "dxbc", "utils",
     "DXBC"]
 
 
+from . import asm
+from . import chunks
 from . import dxbc
 from . import utils
 
