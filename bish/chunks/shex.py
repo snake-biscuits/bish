@@ -1,7 +1,7 @@
 from __future__ import annotations
 import enum
 import io
-from typing import Tuple, Any
+from typing import List, Tuple
 
 from .. import asm
 from ..utils.binary import read_struct
@@ -32,15 +32,15 @@ class Shader_v5:
 
     def __repr__(self) -> str:
         descriptor = f"v{self.version[0]}.{self.version[1]} ({self.type.name})"
-        descriptor = f"{descriptor} {len(self.raw_tokens) // 4} tokens"
+        descriptor = f"{descriptor} {len(self.instructions)} instructions"
         return f"<{self.__class__.__name__} {descriptor} @ 0x{id(self):016X}>"
 
     @classmethod
-    def from_bytes(cls, raw_chunk: bytes) -> SHEX:
+    def from_bytes(cls, raw_chunk: bytes) -> Shader_v5:
         return cls.from_stream(io.BytesIO(raw_chunk))
 
     @classmethod
-    def from_stream(cls, stream: io.BytesIO) -> SHEX:
+    def from_stream(cls, stream: io.BytesIO) -> Shader_v5:
         out = cls()
         version = read_struct(stream, "I")
         type_ = (version & 0xFFFF0000) >> 16
@@ -56,9 +56,9 @@ class Shader_v5:
             try:
                 instruction = asm.Instruction.from_stream(stream)
             except Exception as exc:
-                print(f"! {tokens_read = }")
+                print(f"! {tokens_read=}")
                 raise exc
-            tokens_read += instruction.length
+            tokens_read += len(instruction)
             out.instructions.append(instruction)
         assert tokens_read == length, f"overshot by {tokens_read - length} tokens"
         return out
