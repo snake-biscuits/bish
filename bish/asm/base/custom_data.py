@@ -21,16 +21,19 @@ class CustomDataBlock:
     tokens: List[int]
 
     def __repr__(self) -> str:
-        descriptor = f"{self.type.name} {len(self.tokens) - 2} tokens"
+        descriptor = f"{self.type.name} {len(self.tokens)} tokens"
         return f"<{self.__class__.__name__} {descriptor} @ 0x{id(self):016X}>"
 
     def __len__(self) -> int:
-        return len(self.tokens)
+        return len(self.tokens) + 2
 
     def as_bytes(self) -> bytes:
-        return b"".join(
-            token.to_bytes(4, "little")
-            for token in self.tokens)
+        opcode = opcodes.D3D_10_0.CUSTOM_DATA
+        instruction_token = opcode.value | (self.type.value << 11)
+        return b"".join(map(lambda x: x.to_bytes(4, "little"), [
+            instruction_token,
+            len(self.tokens),
+            *self.tokens]))
 
     @classmethod
     def from_bytes(cls, raw_block: bytes) -> CustomDataBlock:
@@ -43,8 +46,8 @@ class CustomDataBlock:
         opcode = opcodes.opcode_for(token & 0x000003FF)  # [10:00]
         assert opcode == opcodes.D3D_10_0.CUSTOM_DATA
         out.type = Type(token >> 11)  # [32:11]
-        num_tokens = read_struct(stream, "I")
-        assert num_tokens >= 2, "invalid custom data length"
-        # TODO: parse the rest of the block
-        out.tokens = [token, num_tokens, *read_struct(stream, f"{num_tokens - 2}I")]
+        length = read_struct(stream, "I")
+        assert length >= 2, "invalid custom data length"
+        out.tokens = read_struct(stream, f"{length - 2}I")
+        # TODO: parse tokens (varies by out.type)
         return out
