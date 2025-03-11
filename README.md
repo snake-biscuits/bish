@@ -28,8 +28,10 @@ It's **very** picky about which version of `fxc.exe` you use.
 Extract `shdr` resource(s) w/ [rsx](https://github.com/r-ex/rsx)
 
 ```python
->>> from bish import DXBC
->>> fxc = DXBC.from_file("path/to/file.fxc")
->>> len(fxc.SHEX.instructions)
-# some huge number
+>>> import bish
+>>> fxc = bish.DXBC.from_file("path/to/file.fxc")
+>>> assert "SHEX" in fxc.chunks
+>>> shader = bish.chunks.Shader_v5.from_bytes(fxc.SHEX)
+>>> len(shader.instructions)
+# a surprisingly small number
 ```
