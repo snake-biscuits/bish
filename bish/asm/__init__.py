@@ -1,9 +1,9 @@
 __all__ = [
     "base",
-    "Instruction", "Opcode", "Operand", "OperandType"]
+    "Instruction", "Opcode", "opcode_for"]
 
 
 from . import base
-# TODO: instruction subclasses spread over multiple files
 
-from .base import Instruction, Opcode, Operand, OperandType
+from .base.instructions import FullInstruction as Instruction
+from .base.opcodes import Opcode, opcode_for

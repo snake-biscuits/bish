@@ -1,120 +1,27 @@
 # https://github.com/tpn/winsdk-10/blob/master/Include/10.0.10240.0/um/d3d11TokenizedProgramFormat.hpp
-from __future__ import annotations
+__all__ = [
+    "D3D_10_0", "D3D_10_1", "D3D_11_0", "D3D_11_1", "WDDM_1_3",
+    "Opcode", "opcode_for"]
+
 import enum
-import io
-from typing import Any, List, Tuple
-
-from ..utils.binary import read_struct
+from typing import Union
 
 
-class Instruction:
-    # 1st token
-    opcode: Opcode
-    controls: int
-    length: int  # in DWORDS / tokens / uint32s
-    # additional tokens
-    extensions: List[Extension]
-    operands: List[Operand]
-
-    def __init__(self):
-        self.opcode = Opcode.NOP
-        self.controls = 0
-        self.length = 1
-        self.extensions = list()
-        self.operands = list()
-
-    def __repr__(self) -> str:
-        opcode = f"(0x{self.opcode.value:02X}) {self.opcode.name}"
-        operands = " ".join(f"{token:08X}" for token in self.tokens[1:])
-        # operands = ", ".join(
-        #     f"{type_.name}: {value}"
-        #     for type_, value in self.operands)
-        descriptor = f"{opcode} [{operands}]"
-        return f"<{self.__class__.__name__} {descriptor} @ 0x{id(self):016X}>"
-
-    def as_asm(self) -> str:
-        """Assembly representation (Intel syntax)"""
-        raise NotImplementedError("Instruction subclass did not implement .as_asm()")
-
-    @classmethod
-    def from_bytes(cls, raw_instruction: bytes):
-        # TODO: verify length
-        return cls.from_stream(io.BytesIO(raw_instruction))
-
-    @classmethod
-    def from_stream(cls, stream: io.BytesIO):
-        # TODO: TEST: fails appropriately if stream ends prematurely
-        out = cls()
-        token = read_struct(stream, "I")
-        out.opcode = Opcode(token & 0x000003FF)  # [10:00]
-        opcode_str = f"{out.opcode.name} (0x{out.opcode.value:02X})"  # for errors
-        if out.opcode == Opcode.CUSTOM_DATA:
-            # CustomData(Instruction) should implement .from_stream
-            custom_data_class = token >> 11
-            num_tokens = read_struct(stream, "I")
-            assert num_tokens >= 2, "invalid custom data length"
-            raise NotImplementedError(f"{opcode_str}")
-        # standard opcode 1st token data
-        out.controls = (token & 0x00FFF800) >> 11  # [32:11]
-        out.length = (token & 0x7F000000) >> 24  # [30:24]
-        extended = (token & 0x80000000) >> 31  # [31]
-        assert out.length >= 1, f"{opcode_str} has invalid instruction length"
-        while extended:  # d3d11TokenizedProgramFormat.hpp:520
-            # TODO: ExtendedToken class
-            token = read_struct(stream, "I")
-            extended_type = ExtendedOpcodeType(token & 0x3F)  # [05:00]
-            controls = (token & 0x7FFFFFC0) >> 6  # [30:06]
-            extended = (token & 0x80000000) >> 31  # [31]
-            # TODO: parse controls for extended_type
-            out.extensions.append((extended_type, controls))
-        if out.opcode.name.startswith("DCL_"):
-            raise NotImplementedError(f"{opcode_str} has custom operand format")
-            # NOTE: might not matter since we only collect tokens here
-        num_operands = out.length - 1 - len(out.extensions)
-        operand_tokens = read_struct(stream, f"{num_operands}I")
-        # d3d11TokenizedProgramFormat.hpp:690
-        # TODO: OperandToken class
-        # [01:00] num_components {0:0, 1:1, 2:4, 3:n}  # N is "unused for now"
-        # [11:02] component selection
-        return out
+def opcode_for(value: int):
+    all_opcodes = {
+        opcode.value: opcode
+        for opcode in [
+            *D3D_10_0, *D3D_10_1,
+            *D3D_11_0, *D3D_11_1,
+            *WDDM_1_3]}
+    if value in all_opcodes:
+        return all_opcodes[value]
+    else:
+        raise RuntimeError(f"Invalid Opcode Value: 0x{value:02X}")
 
 
-class CustomDataClass(enum.Enum):
-    COMMENT = 0x00
-    DEBUG_INFO = 0x01
-    OPAQUE = 0x02
-    DCL_IMMEDIATE_CONSTANT_BUFFER = 0x03
-    SHADER_MESSAGE = 0x04
-    SHADER_CLIP_PLANE_CONSTANT_MAPPINGS = 0x05  # for DirectX 9
-
-
-
-class ExtensionType(enum.Enum):
-    EMPTY = 0x00
-    SAMPLE_CONTROLS = 0x01
-    RESOURCE_DIMENSION = 0x02
-    RETURN_TYPE = 0x03
-
-
-Extension = Tuple[ExtensionType, Any]
-# ^ (type, values)
-
-
-class OperandType(enum.Enum):
-    Dest = 0  # Destination Register / ???
-    Src = 1  # Source Register / ???
-    Imm = 2  # Immediate Value
-    # Address / Pointer?
-
-
-Operand = Tuple[OperandType, int]
-# ^ (type, value)
-
-
-# TODO: some way to get opcode group (DX11 etc.)
-class Opcode(enum.Enum):
-    """D3D10_SB_OPCODE_TYPE"""
-    # D3D 10.0
+class D3D_10_0(enum.Enum):
+    """D3D 10.0 Opcodes"""
     ADD = 0x00
     AND = 0x01
     BREAK = 0x02
@@ -168,7 +75,7 @@ class Opcode(enum.Enum):
     MAD = 0x32
     MIN = 0x33
     MAX = 0x34
-    CUSTOM_DATA = 0x35  # followed by custom data block
+    CUSTOM_DATA = 0x35  # custom_data.CustomDataBlock
     MOV = 0x36
     MOV_C = 0x37
     MUL = 0x38
@@ -200,10 +107,9 @@ class Opcode(enum.Enum):
     UMAD = 0x52
     UMAX = 0x53
     UMIN = 0x54
-    USHR = 0x55
-    UTOF = 0x56
+    USHR = 0x55  # Unsigned Shift Right?
+    U_TO_F = 0x56
     XOR = 0x57
-    # NOTE: "DCL_* opcodes have custom operand formats"
     DCL_RESOURCE = 0x58
     DCL_CONSTANT_BUFFER = 0x59
     DCL_SAMPLER = 0x5A
@@ -223,29 +129,28 @@ class Opcode(enum.Enum):
     DCL_TEMPS = 0x68
     DCL_INDEXABLE_TEMP = 0x69
     DCL_GLOBAL_FLAGS = 0x6A
+    RESERVED = 0x6B
 
-    RESERVED_0 = 0x6B
 
-    # D3D 10.1
+class D3D_10_1(enum.Enum):
+    """D3D 10.1 Opcodes"""
     LOD = 0x6C
     GATHER_4 = 0x6D
     SAMPLE_POS = 0x6E
     SAMPLE_INFO = 0x6F
+    RESERVED = 0x70
 
-    RESERVED_1 = 0x70
 
-    # D3D 11.0
-    # NOTE: "HS_* marks begining of HS sub-shader"
+class D3D_11_0(enum.Enum):
+    """D3D 11.0 Opcodes"""
     HS_DECLS = 0x71
     HS_CONTROL_POINT_PHASE = 0x72
     HS_FORK_PHASE = 0x73
     HS_JOIN_PHASE = 0x74
-
     EMIT_STREAM = 0x75
     CUT_STREAM = 0x76
     EMIT_THEN_CUT_STREAM = 0x77
     INTERFACE_CALL = 0x78
-
     BUF_INFO = 0x79
     DERIV_RTX_COARSE = 0x7A
     DERIV_RTX_FINE = 0x7B
@@ -268,12 +173,10 @@ class Opcode(enum.Enum):
     BFI = 0x8C
     BFREV = 0x8D
     SWAPC = 0x8E
-
     DCL_STREAM = 0x8F
     DCL_FUNCTION_BODY = 0x90
     DCL_FUNCTION_TABLE = 0x91
     DCL_INTERFACE = 0x92
-
     DCL_INPUT_CONTROL_POINT_COUNT = 0x93
     DCL_OUTPUT_CONTROL_POINT_COUNT = 0x94
     DCL_TESS_DOMAIN = 0x95
@@ -282,7 +185,6 @@ class Opcode(enum.Enum):
     DCL_HS_MAX_TESSFACTOR = 0x98
     DCL_HS_FORK_PHASE_INSTANCE_COUNT = 0x99
     DCL_HS_JOIN_PHASE_INSTANCE_COUNT = 0x9A
-
     DCL_THREAD_GROUP = 0x9B
     DCL_UNORDERED_ACCESS_VIEW_TYPED = 0x9C
     DCL_UNORDERED_ACCESS_VIEW_RAW = 0x9D
@@ -319,7 +221,6 @@ class Opcode(enum.Enum):
     IMM_ATOMIC_UMAX = 0xBC
     IMM_ATOMIC_UMIN = 0xBD
     SYNC = 0xBE
-
     DADD = 0xBF
     DMAX = 0xC0
     DMIN = 0xC1
@@ -332,33 +233,30 @@ class Opcode(enum.Enum):
     DMOVC = 0xC8
     DTOF = 0xC9
     FTOD = 0xCA
-
     EVAL_SNAPPED = 0xCB
     EVAL_SAMPLE_INDEX = 0xCC
     EVAL_CENTROID = 0xCD
-
     DCL_GS_INSTANCE_COUNT = 0xCE
-
     ABORT = 0xCF
     DEBUG_BREAK = 0xD0
+    RESERVED = 0xD1
 
-    RESERVED_3 = 0xD1  # D3D11_SB_OPCODE_RESERVED0
 
-    # D3D 11.1
+class D3D_11_1(enum.Enum):
+    """D3D 11.1 Opcodes"""
     DDIV = 0xD2
     DFMA = 0xD3
     DRCP = 0xD4
-
     MSAD = 0xD5
-
     D_TO_I = 0xD6
     D_TO_U = 0xD7
     I_TO_D = 0xD8
     U_TO_D = 0xD9
+    RESERVED = 0xDA
 
-    RESERVED_4 = 0xDA  # D3D11_1_SB_OPCODE_RESERVED0
 
-    # WDDM 1.3
+class WDDM_1_3(enum.Enum):
+    """WDDM 1.3 Opcodes"""
     GATHER_4_FEEDBACK = 0xDB
     GATHER_4_C_FEEDBACK = 0xDC
     GATHER_4_PO_FEEDBACK = 0xDD
@@ -370,12 +268,12 @@ class Opcode(enum.Enum):
     LD_STRUCTURED_FEEDBACK = 0xE3
     SAMPLE_L_FEEDBACK = 0xE4
     SAMPLE_C_LZ_FEEDBACK = 0xE5
-
     SAMPLE_CLAMP_FEEDBACK = 0xE6
     SAMPLE_B_CLAMP_FEEDBACK = 0xE7
     SAMPLE_D_CLAMP_FEEDBACK = 0xE8
     SAMPLE_C_CLAMP_FEEDBACK = 0xE9
-
     CHECK_ACCESS_FULLY_MAPPED = 0xEA
+    RESERVED = 0xEB
 
-    RESERVED_5 = 0xEB  # D3DWDDM1_3_SB_OPCODE_RESERVED0
+
+Opcode = Union[D3D_10_0, D3D_10_1, D3D_11_0, D3D_11_1, WDDM_1_3]
