@@ -24,6 +24,28 @@
    - understanding > machine translation
 
 
+## Top-Level
+ * program analysis
+   - jumps, calls, labels, general program flow
+ * decompiler
+   - DXBC SHEX tokens -> .asm text
+   - .asm -> .hlsl
+     this is where the refactoring tools are going to come in
+   - human readable instructions
+ * emulator
+   - graphical?
+   - simulate registers, dump values
+ * refactor tools
+   - verify editted code has same outcome
+     compile small HLSL snippets?
+   - instruction reordering
+     readability > optimisation
+   - simplify block
+     multiple lines of .asm -> one line of .hlsl
+     reduce cognitive complexity
+     LaTeX representation?
+
+
 ## General HLSL notes
 
 > TODO: copy notes from `~/drives/ssd1/Mod/_tools/HLSL`
@@ -40,6 +62,7 @@ track each time a register-swizzle appears
  * automated reducer w/ list of stragies (e.g. minimal brackets)
  * standardised order for common variables
    - identified by usage / index (Normal, Position, Light, Ambient, Albedo etc.)
+
 
 ## Multi-line Representaion
 ```c++
