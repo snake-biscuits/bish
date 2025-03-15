@@ -21,7 +21,7 @@ class ResourceDefinition:
 
     def __repr__(self) -> str:
         descriptor = f"v{self.version[0]}.{self.version[1]}"
-        # TODO: program_type.name
+        # TODO: program_type.name & flags.name
         return f"<{self.__class__.__name__} {descriptor} @ 0x{id(self):016X}>"
 
     @classmethod
@@ -111,7 +111,7 @@ class ConstBuffer:
         # variables
         stream.seek(variable_offset)
         out.variables = [
-            variable_class.from_stream(stream)
+            variable_class.from_stream(stream, version)
             for i in range(variable_count)]
         s = variable_offset
         e = s + {(0, 5): 40}[version] * variable_count
@@ -136,7 +136,7 @@ class ShaderType:
     def from_stream(cls, stream) -> ShaderType:
         out = cls()
         start = stream.tell()
-        print(f'({start}, {start + 16}): "{cls.__name__}",')
+        print(f'({start}, {start + 16}): "ShaderType",')
         out.var_class = VariableClass(read_struct(stream, "h"))
         out.var_type = VariableType(read_struct(stream, "H"))
         out.rows = read_struct(stream, "H")
@@ -147,7 +147,10 @@ class ShaderType:
         # members
         stream.seek(member_offset)
         out.members = read_struct(stream, f"{num_members}B")  # guessing
-        print(f'({member_offset}, {member_offset + num_members}): "ShaderType.members",')
+        if num_members != 0:
+            s = member_offset
+            e = s + 1 * num_members
+            print(f'({s}, {e}): "ShaderType.members",')
         stream.seek(start + 16)
         return out
 
@@ -247,25 +250,27 @@ class VariableType(enum.Enum):
 
 class ShaderVariable:
     name: str
-    variable: bytes
+    variable: Tuple[int, int]  # ???
+    # ^ (offset, length)
     flags: int
     # idk the lengths to read these, so I'm just gonna keep the offsets for now
-    type_offset: int
-    default_variable_offset: int
+    type_offset: int  # ShaderType?
+    default_variable_offset: int  # ???
 
     def __repr__(self) -> str:
         descriptor = f"{self.name}"
         return f"<{self.__class__.__name__} {descriptor} @ 0x{id(self):016X}>"
 
     @classmethod
-    def from_stream(cls, stream: io.BytesIO) -> ShaderVariable:
+    def from_stream(cls, stream: io.BytesIO, version: Tuple[int, int] = (0, 5)) -> ShaderVariable:
         out = cls()
         start = stream.tell()
         name_offset = read_struct(stream, "I")
-        variable_offset = read_struct(stream, "I")
+        variable_offset = read_struct(stream, "I")  # relative to something?
         variable_length = read_struct(stream, "I")
+        out.variable = (variable_offset, variable_length)
         out.flags = read_struct(stream, "I")
-        out.type_offset = read_struct(stream, "I")  # ShaderType?
+        type_offset = read_struct(stream, "I")  # ShaderType?
         out.default_variable_offset = read_struct(stream, "I")  # ???
         # name
         stream.seek(name_offset)
@@ -273,20 +278,29 @@ class ShaderVariable:
         s = name_offset
         e = s + len(out.name) + 1
         print(f'({s}, {e}): "ShaderVariable.name",')
-        # variable
-        stream.seek(variable_offset)
-        out.variable = stream.read(variable_length)
+        # type
+        assert version[0] == 0
+        if version[1] < 5:
+            type_class = ShaderType
+        elif version[1] == 5:
+            type_class = ShaderType_v5
+        else:
+            v = f"v{version[0]}.{version[1]}"
+            raise NotImplementedError(f"unknown ShaderVariable version: {v}")
+        stream.seek(type_offset)
+        out.type = type_class.from_stream(stream)
         stream.seek(start + 24)
         return out
 
 
 class ShaderVariable_v5(ShaderVariable):
+    # type: ShaderType_v5
     texture: bytes
     sampler: bytes
 
     @classmethod
-    def from_stream(cls, stream: io.BytesIO) -> ShaderVariable:
-        out = super(ShaderVariable_v5, cls).from_stream(stream)
+    def from_stream(cls, stream: io.BytesIO, version: Tuple[int, int] = (0, 5)) -> ShaderVariable:
+        out = super(ShaderVariable_v5, cls).from_stream(stream, version)
         start = stream.tell()
         texture_offset = read_struct(stream, "i")
         texture_length = read_struct(stream, "I")
@@ -350,6 +364,8 @@ class ResourceBinding:
         # name
         stream.seek(name_offset)
         out.name = read_str(stream)
-        print(f'({name_offset}, {name_offset + len(out.name) + 1}): "ResourceBinding.name",')
+        s = name_offset
+        e = s + len(out.name) + 1
+        print(f'({s}, {e}): "ResourceBinding.name",')
         stream.seek(start + 32)
         return out
