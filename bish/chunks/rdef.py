@@ -6,6 +6,12 @@ from typing import Any, List, Tuple
 from ..utils.binary import read_str, read_struct
 
 
+# NOTE: lots of ShaderTypes & strings will be parsed more than once
+# -- would be clever to keep a cache of what was parsed from where
+# -- also lets us confirm the whole chunk has been parsed
+# -- instead of manually checking debug prints
+
+
 class ResourceDefinition:
     """constant buffers & resource bindings"""
     version: Tuple[int]  # (major, minor)
@@ -32,7 +38,6 @@ class ResourceDefinition:
     def from_stream(cls, stream: io.BytesIO) -> ResourceDefinition:
         out = cls()
         start = stream.tell()
-        print(f'({start}, {start + 60}): "{cls.__name__}",')
         num_const_buffers = read_struct(stream, "I")
         const_buffer_offset = read_struct(stream, "I")
         num_resource_bindings = read_struct(stream, "I")
@@ -48,22 +53,13 @@ class ResourceDefinition:
         stream.seek(start + const_buffer_offset)
         for i in range(num_const_buffers):
             out.const_buffers.append(ConstBuffer.from_stream(stream))
-        s = start + const_buffer_offset
-        e = s + 24 * num_const_buffers
-        print(f'({s}, {e}): "ConstBuffers",')
         # resource bindings
         stream.seek(start + resource_binding_offset)
         for i in range(num_resource_bindings):
             out.resource_bindings.append(ResourceBinding.from_stream(stream))
-        s = start + resource_binding_offset
-        e = s + 32 * num_resource_bindings
-        print(f'({s}, {e}): "ResourceBindings",')
         # creator
         stream.seek(start + creator_offset)
         out.creator = read_str(stream)
-        s = start + creator_offset
-        e = s + len(out.creator) + 1
-        print(f'({s}, {e}): "ResourceDefinition.creator",')
         # NOTE: stream.tell() should be at the end of the lump
         return out
 
@@ -96,9 +92,6 @@ class ConstBuffer:
         # name
         stream.seek(name_offset)
         out.name = read_str(stream)
-        s = name_offset
-        e = s + len(out.name) + 1
-        print(f'({s}, {e}): "ConstBuffer.name",')
         # variables
         assert version[0] == 0
         if version[1] < 5:
@@ -113,9 +106,6 @@ class ConstBuffer:
         out.variables = [
             variable_class.from_stream(stream, version)
             for i in range(variable_count)]
-        s = variable_offset
-        e = s + {(0, 5): 40}[version] * variable_count
-        print(f'({s}, {e}): "ShaderVariables",')
         stream.seek(start + 24)
         return out
 
@@ -136,7 +126,6 @@ class ShaderType:
     def from_stream(cls, stream) -> ShaderType:
         out = cls()
         start = stream.tell()
-        print(f'({start}, {start + 16}): "ShaderType",')
         out.var_class = VariableClass(read_struct(stream, "h"))
         out.var_type = VariableType(read_struct(stream, "H"))
         out.rows = read_struct(stream, "H")
@@ -149,10 +138,6 @@ class ShaderType:
         out.members = [
             Member.from_stream(stream)
             for i in range(num_members)]
-        if num_members != 0:
-            s = member_offset
-            e = s + 12 * num_members
-            print(f'({s}, {e}): "ShaderType.members",')
         stream.seek(start + 16)
         return out
 
@@ -161,21 +146,18 @@ class ShaderType_v5(ShaderType):
     parent_type_offset: int
     unknown: Tuple[int, int, int]
     parent_name: str
+    # NOTE: if .parent_type_offset is 0, .parent_name may as well be .name
 
     @classmethod
     def from_stream(cls, stream) -> ShaderType_v5:
         out = super(ShaderType_v5, cls).from_stream(stream)
         start = stream.tell()
-        print(f'({start}, {start + 20}): "{cls.__name__}",')
         out.parent_type_offset = read_struct(stream, "I")
         out.unknown = read_struct(stream, "3I")
         parent_name_offset = read_struct(stream, "I")
         # parent_name
         stream.seek(parent_name_offset)
         out.parent_name = read_str(stream)
-        s = parent_name_offset
-        e = s + len(out.parent_name) + 1
-        print(f'({s}, {e}): "ShaderType_v5.parent_name",')
         stream.seek(start + 20)
         return out
 
@@ -200,15 +182,9 @@ class Member:
         # name
         stream.seek(name_offset)
         out.name = read_str(stream)
-        s = name_offset
-        e = s + len(out.name) + 1
-        print(f'({s}, {e}): "Member.name",')
         # unknown
         stream.seek(type_offset)
         out.type = ShaderType_v5.from_stream(stream)
-        s = type_offset
-        e = s + 36
-        print(f'({s}, {e}): "Member.type",')
         stream.seek(start + 12)
         return out
 
@@ -310,9 +286,6 @@ class ShaderVariable:
         # name
         stream.seek(name_offset)
         out.name = read_str(stream)
-        s = name_offset
-        e = s + len(out.name) + 1
-        print(f'({s}, {e}): "ShaderVariable.name",')
         # type
         assert version[0] == 0
         if version[1] < 5:
@@ -345,9 +318,6 @@ class ShaderVariable_v5(ShaderVariable):
         if texture_offset != -1:
             stream.seek(texture_offset)
             out.texture = stream.read(texture_length)
-            s = texture_offset
-            e = s + texture_length
-            print(f'({s}, {e}): "ShaderVariable_v5.texture",')
         else:
             assert texture_length == 0
             out.texture = b""
@@ -355,9 +325,6 @@ class ShaderVariable_v5(ShaderVariable):
         if sampler_offset != -1:
             stream.seek(sampler_offset)
             out.sampler = stream.read(sampler_length)
-            s = sampler_offset
-            e = s + sampler_length
-            print(f'({s}, {e}): "ShaderVariable_v5.sampler",')
         else:
             assert sampler_length == 0
             out.sampler = b""
@@ -399,8 +366,5 @@ class ResourceBinding:
         # name
         stream.seek(name_offset)
         out.name = read_str(stream)
-        s = name_offset
-        e = s + len(out.name) + 1
-        print(f'({s}, {e}): "ResourceBinding.name",')
         stream.seek(start + 32)
         return out
