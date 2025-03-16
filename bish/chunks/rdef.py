@@ -182,16 +182,20 @@ class ShaderType_v5(ShaderType):
 
 class Member:
     name: str
-    unknown: List[int]
-    # ^ 2x bitfield, 6x 0, 1x string pointer
+    type: ShaderType_v5
     offset: int  # struct offset?
+
+    def __repr__(self) -> str:
+        type_repr = f"{self.type.var_class.name} {self.type.var_type.name}"
+        descriptor = f"{self.name} ({type_repr})"
+        return f"<{self.__class__.__name__} {descriptor} @ 0x{id(self):016X}>"
 
     @classmethod
     def from_stream(cls, stream: io.BytesIO) -> Member:
         out = cls()
         start = stream.tell()
         name_offset = read_struct(stream, "I")
-        unknown_offset = read_struct(stream, "I")
+        type_offset = read_struct(stream, "I")
         out.offset = read_struct(stream, "I")
         # name
         stream.seek(name_offset)
@@ -200,12 +204,11 @@ class Member:
         e = s + len(out.name) + 1
         print(f'({s}, {e}): "Member.name",')
         # unknown
-        stream.seek(unknown_offset)
-        out.unknown = read_struct(stream, "9I")
-        # ? ? 0 0 0 0 0 0 string_pointer
-        s = unknown_offset
+        stream.seek(type_offset)
+        out.type = ShaderType_v5.from_stream(stream)
+        s = type_offset
         e = s + 36
-        print(f'({s}, {e}): "Member.unknown",')
+        print(f'({s}, {e}): "Member.type",')
         stream.seek(start + 12)
         return out
 
