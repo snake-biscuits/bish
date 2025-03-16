@@ -126,7 +126,7 @@ class ShaderType:
     rows: int
     columns: int
     num_elements: int
-    members: bytes  # List[ShaderType]
+    members: List[Tuple[int, int, int]]
 
     def __repr__(self) -> str:
         descriptor = f"{self.var_class.name} {self.var_type.name}"
@@ -146,10 +146,12 @@ class ShaderType:
         member_offset = read_struct(stream, "I")
         # members
         stream.seek(member_offset)
-        out.members = read_struct(stream, f"{num_members}B")  # guessing
+        out.members = [
+            read_struct(stream, "3I")
+            for i in range(num_members)]
         if num_members != 0:
             s = member_offset
-            e = s + 1 * num_members
+            e = s + 12 * num_members
             print(f'({s}, {e}): "ShaderType.members",')
         stream.seek(start + 16)
         return out
