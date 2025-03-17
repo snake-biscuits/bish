@@ -3,6 +3,7 @@ import io
 import struct
 from typing import Dict, Tuple
 
+from . import chunks
 from .utils.binary import read_struct
 
 
@@ -11,6 +12,15 @@ class DXBC:
     filesize: int
     chunks: Dict[str, Tuple[int, int]]
     # ^ {"id": (offset, length)}
+    loading_errors: Dict[str, Exception]
+    # ^ {"id": Error}
+
+    def __init__(self):
+        self.chunks = dict()
+        self.loading_errors = dict()
+        # defaults
+        self.checksum = b""
+        self.filesize = 0
 
     def __repr__(self) -> str:
         descriptor = f"{len(self.chunks)} chunks {self.filesize} bytes"
@@ -35,7 +45,6 @@ class DXBC:
         assert one == 1
         out.filesize = filesize
         chunk_offsets = struct.unpack(f"{num_chunks}I", stream.read(num_chunks * 4))
-        out.chunks = dict()
         for offset in chunk_offsets:
             stream.seek(offset)
             assert stream.tell() == offset
@@ -46,9 +55,17 @@ class DXBC:
             assert not any(
                 offset < other_offset < offset + length
                 for other_offset in chunk_offsets)
-            data = stream.read(length)
-            assert len(data) == length
-            # TODO: convert data from bytes
-            setattr(out, name, data)
+            raw_chunk = stream.read(length)
+            assert len(raw_chunk) == length
+            if name in chunks.parser:
+                try:
+                    parsed_chunk = chunks.parser[name].from_bytes(raw_chunk)
+                    setattr(out, name, parsed_chunk)
+                    setattr(out, f"RAW_{name}", raw_chunk)  # for debugging
+                except Exception as exc:
+                    out.loading_errors[name] = exc
+                    setattr(out, name, raw_chunk)
+            else:
+                setattr(out, name, raw_chunk)
         # NOTE: we're closing the stream now, hope we got everything!
         return out
