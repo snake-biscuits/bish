@@ -261,10 +261,9 @@ class VariableType(enum.Enum):
 
 class ShaderVariable:
     name: str
-    variable: Tuple[int, int]  # ???
+    variable: Tuple[int, int]
     # ^ (offset, length)
     flags: int
-    # idk the lengths to read these, so I'm just gonna keep the offsets for now
     type_offset: int  # ShaderType?
     default_variable_offset: int  # ???
 
