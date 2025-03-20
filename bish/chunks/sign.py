@@ -10,6 +10,10 @@ class Signature:
     unique_key: int
     elements: List[Element]
 
+    def __repr__(self) -> str:
+        descriptor = f"{len(self.elements)} elements"
+        return f"<{self.__class__.__name__} {descriptor} @ 0x{id(self):016X}>"
+
     @classmethod
     def from_bytes(cls, raw_isgn: bytes) -> Signature:
         return cls.from_stream(io.BytesIO(raw_isgn))
@@ -26,10 +30,10 @@ class Signature:
 
 
 class Element:
-    name: str
+    name: str  # semantic name (conveys intended use)
     semantic_index: int
     semantic_value_type: int
-    component_type: int
+    component_type: int  # TODO: enum
     register: int
     mask: int
     read_write_mask: int
