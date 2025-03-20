@@ -22,3 +22,16 @@ parser = {
     "RDEF": ResourceDefinition,
     "SHEX": Shader_v5,
     "STAT": Statistics}
+# ^ {chunk_id, parser_class}
+
+unsupported_chunks = {
+    "IFCE": "Interfaces",
+    "ISG1": "In Signature w/ Stream & MinPrecision",
+    "OSG1": "Out Signature w/ Stream & MinPrecision",
+    "OSG5": "Out Signature (Shader Model 5)",
+    "PCSG": "Patch Constant Signature Chunk",
+    "SFIO": "???",
+    "SHDR": "Shader (Shader Model 4)",
+    "SPDB": "Debug",
+    "XHSH": "???"}  # 8 bytes, appears in vertex shaders; hash?
+# ^ {chunk_id, purpose}
