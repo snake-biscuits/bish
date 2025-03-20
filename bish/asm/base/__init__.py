@@ -3,8 +3,8 @@ __all__ = [
     "FullInstruction", "Instruction",
     "CustomDataBlock",
     "Extension",
-    "Operand", "operand_for",
-    "Opcode", "opcode_for"]
+    "Opcode", "opcode_for",
+    "FullOperand", "Operand"]
 
 
 from . import custom_data
@@ -17,4 +17,4 @@ from .custom_data import CustomDataBlock
 from .extensions import Extension
 from .instructions import FullInstruction, Instruction
 from .opcodes import Opcode, opcode_for
-from .operands import Operand, operand_for
+from .operands import FullOperand, Operand

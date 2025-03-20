@@ -17,7 +17,7 @@ class FullInstruction:
     custom_data: Union[custom_data.CustomDataBlock, None]
     # ^ only used if opcode is D3D_10_0.CUSTOM_DATA
     extensions: List[extensions.Extension]
-    operands: List[operands.Operand]
+    operands: List[int]
 
     def __init__(self):
         instruction = Instruction()
@@ -66,13 +66,10 @@ class FullInstruction:
         while prev_token.is_extended:
             prev_token = extensions.Extension.from_stream(stream)
             out.extensions.append(prev_token)
-        # TODO: confirm there isn't a num_operands token in the .hpp spec
         num_operands = out.instruction.length - len(out.extensions) - 1
-        # operand_class = operands.operand_for(out.opcode)
         for i in range(num_operands):
-            # operand = operand_class.from_stream(stream)
-            operand = read_struct(stream, "I")  # parsing not implemented yet
-            out.operands.append(operand)
+            # TODO: use operand class, can consume multiple tokens
+            out.operands.append(read_struct(stream, "I"))
         return out
 
 
