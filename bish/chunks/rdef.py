@@ -358,7 +358,7 @@ class ResourceBinding:
         out.type = read_struct(stream, "I")
         out.return_type = read_struct(stream, "I")
         out.dimension = read_struct(stream, "I")
-        out.num_samples = read_struct(stream, "I")
+        out.num_samples = read_struct(stream, "i")
         out.bind_point = read_struct(stream, "I")
         out.bind_count = read_struct(stream, "I")
         out.flags = read_struct(stream, "I")
