@@ -1,12 +1,16 @@
 # **B**ikkie's **I**nteractive **Sh**ader Tool
 
 `BISh` is reverse engineering tool for Titanfall 2's Shaders
-Designed to be used in a REPL, like [`bsp_tool`](https://github.com/snake-biscuits/bsp_tool)
+
+Designed to be used in a REPL (e.g. `ipython`)
+
+Just like using [`bsp_tool`](https://github.com/snake-biscuits/bsp_tool)
 
 
 ## Shader Spec
 
 Titanfall 2's shaders are a pain to replicate.
+
 It's **very** picky about which version of `fxc.exe` you use.
 
 **Don't expect this tool to support anything outside this spec.**
