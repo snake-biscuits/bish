@@ -50,4 +50,21 @@ class CustomDataBlock:
         assert length >= 2, "invalid custom data length"
         out.tokens = read_struct(stream, f"{length - 2}I")
         # TODO: parse tokens (varies by out.type)
+        # GOTO: around line 1577 in .hpp reference
+        # -- DCL_IMMEDIATE_CONSTANT_BUFFER => vec4[]
+        # -- SHADER_MESSAGE =>
+        # --- id, format, len_string,
+        # --- num_operands, len_operands, operands
+        # --- string w/ trailing 0x00s, padded to 32-bit alignment (4 bytes)
+        # --- operands used for "argument substitutions"
         return out
+
+
+class MessageID(enum.Enum):
+    MESSAGE = 0x00200102
+    ERROR = 0x00200103
+
+
+class MessageFormat(enum.Enum):
+    TEXT = 0x00
+    PRINTF = 0x01  # C/C++ style printf string
