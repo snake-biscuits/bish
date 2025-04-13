@@ -29,9 +29,8 @@ Extract `shdr` resource(s) w/ [rsx](https://github.com/r-ex/rsx)
 
 ```python
 >>> import bish
->>> fxc = bish.DXBC.from_file("path/to/file.fxc")
+>>> fxc = bish.DXBC.from_file("rsx/exported_files/shader/filename.fxc")
 >>> assert "SHEX" in fxc.chunks
->>> shader = bish.chunks.Shader_v5.from_bytes(fxc.SHEX)
->>> len(shader.instructions)
+>>> len(fxc.SHEX.instructions)
 # a surprisingly small number
 ```
