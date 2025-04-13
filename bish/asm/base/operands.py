@@ -6,7 +6,7 @@ from typing import List, Tuple, Union
 
 from ...utils.binary import read_struct
 from . import tokens
-from . import opcodes
+# from . import opcodes
 
 
 # NOTE: we aren't going to validate operand types against opcodes
@@ -25,7 +25,16 @@ class FullOperand:
     # ^ [(imm, rel)]
 
     def __init__(self):
+        self.selection_mode = None
+        self.mask = None
+        self.swizzle = None
+        self.name = None
+        self.index_representations = list()
         self.indices = list()
+
+    def __repr__(self) -> str:
+        descriptor = f"{self.swizzle_str()} {len(self.indices)} indices"
+        return f"<{self.__class__.__name__} {descriptor} @ 0x{id(self):016X}>"
 
     def __len__(self) -> int:
         num_index_tokens = 0
@@ -38,7 +47,22 @@ class FullOperand:
                 num_index_tokens += len(self.indices[i][1])
         return 1 + num_index_tokens
 
-    # TODO: string form: "register.swizzle"
+    def swizzle_str(self) -> str:
+        if self.selection_mode is None:
+            return
+        elif self.selection_mode == SelectionMode.MASK:
+            swizzle = "".join([x.name for x in self.mask])
+        elif self.selection_mode == SelectionMode.SWIZZLE:
+            swizzle = "".join([x.name for x in self.swizzle])
+        elif self.selection_mode == SelectionMode.SELECT_1:
+            swizzle = self.name.name
+        else:
+            raise RuntimeError("Invalid Selection Mode")
+        return f".{swizzle}"
+
+    @classmethod
+    def from_bytes(cls, raw_tokens: bytes) -> FullOperand:
+        return cls.from_stream(io.BytesIO(raw_tokens))
 
     @classmethod
     def from_stream(cls, stream: io.BytesIO) -> FullOperand:
@@ -64,6 +88,12 @@ class FullOperand:
             out.indices.append((imm, rel))
         return out
 
+    @classmethod
+    def from_tokens(cls, tokens: List[int]) -> FullOperand:
+        return cls.from_bytes(b"".join([
+            token.to_bytes(4, "little")
+            for token in tokens]))
+
 
 class Operand(tokens.Token):
     type: Type
@@ -80,6 +110,23 @@ class Operand(tokens.Token):
         self.swizzle = None
         self.name = None
         self.index_representations = list()
+
+    def __repr__(self) -> str:
+        descriptor = self.swizzle_str()
+        return f"<{self.__class__.__name__} {descriptor} @ 0x{id(self):016X}>"
+
+    def swizzle_str(self) -> str:
+        if self.selection_mode is None:
+            return
+        elif self.selection_mode == SelectionMode.MASK:
+            swizzle = "".join([x.name for x in self.mask])
+        elif self.selection_mode == SelectionMode.SWIZZLE:
+            swizzle = "".join([x.name for x in self.swizzle])
+        elif self.selection_mode == SelectionMode.SELECT_1:
+            swizzle = self.name.name
+        else:
+            raise RuntimeError("Invalid Selection Mode")
+        return f".{swizzle}"
 
     @classmethod
     def from_token(cls, token: int) -> Operand:
@@ -106,6 +153,7 @@ class Operand(tokens.Token):
             out.index_representations.append(index_repr)
         out.is_extended = bool(token >> 31)  # [31]
         # cleanup assertions
+        # NOTE: breaking for DCL_TEMPS
         if num_components in (NumComponents.ZERO, NumComponents.ONE):
             assert (token & 0x00000FFC) >> 2 == 0
         assert num_components != NumComponents.N
