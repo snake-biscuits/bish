@@ -26,6 +26,32 @@ class DXBC:
         descriptor = f"{len(self.chunks)} chunks {self.filesize} bytes"
         return f"<{self.__class__.__name__} {descriptor} @ 0x{id(self):016X}>"
 
+    def as_bytes(self) -> bytes:
+        """for extracting from .vcs"""
+        header = [
+            b"DXBC",
+            self.checksum,
+            struct.pack("3I", 1, self.filesize, len(self.chunks))]
+        chunk_offsets, chunk_data = list(), list()
+        # TODO: verify chunk offsets line up
+        for name, (offset, length) in self.chunks.items():
+            raw_chunk = getattr(self, f"RAW_{name}")
+            assert isinstance(raw_chunk, bytes)
+            assert len(raw_chunk) == length
+            chunk_offsets.append(struct.pack("I", offset))
+            chunk_data.extend([
+                name.encode("ascii", "strict"),
+                struct.pack("I", length),
+                raw_chunk])
+        return b"".join([
+            *header,
+            *chunk_offsets,
+            *chunk_data])
+
+    def save_as(self, filename: str):
+        with open(filename, "wb") as out_file:
+            out_file.write(self.as_bytes())
+
     @classmethod
     def from_bytes(cls, raw_data: bytes) -> DXBC:
         return cls.from_stream(io.BytesIO(raw_data))
