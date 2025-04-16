@@ -1,8 +1,12 @@
+# https://developer.valvesoftware.com/wiki/VCS
+# https://github.com/ValveSoftware/source-sdk-2013/blob/master/src/public/materialsystem/shader_vcs_version.h
+# https://github.com/EM4Volts/vcs_repack/blob/main/vcspy.py
 from __future__ import annotations
 import io
-from typing import Dict
+from typing import List, Tuple
 
 from .utils.binary import read_struct
+# from .utils.binary import xxd
 from . import dxbc
 
 
@@ -11,23 +15,30 @@ from . import dxbc
 
 class VCS:
     """Valve Compiled Shader (Titanfall 1 variant)"""
-    # https://developer.valvesoftware.com/wiki/VCS
     num_combos: int
     num_dynamic_combos: int
     flags: int  # TODO: enum
     centroid_mask: int
-    num_static_combos: int  # idk, can be larger than num_combos
     crc: int  # CRC32
-    unknown_1: int
-    unknown_2: int
+    static_combos: List[Tuple[int, int]]
+    # ^ [(combo_id, offset)]
     filesize: int
-    unknown_3: int
-    unknown_4: int
-    shaders: Dict[int, dxbc.DXBC]
-    # ^ {shader_id: shader}
+    duplicates: List[Tuple[int, int]]
+    # ^ [(combo_id, source_id)]
+    unknown: int  # looks like a bit mask?
+    shaders: List[dxbc.DXBC]
 
     def __init__(self):
-        self.shaders = dict()
+        self.num_combos = 0  # len(self.shaders)
+        self.num_dynamic_combos = 0
+        self.flags = 0x00000000
+        self.centroid_mask = 0x00000000
+        self.crc = 0x00000000
+        self.static_combos = list()
+        self.filesize = 0
+        self.duplicates = list()
+        self.unknown = 0
+        self.shaders = list()
 
     def __repr__(self):
         descriptor = f"{len(self.shaders)} shaders"
@@ -53,40 +64,63 @@ class VCS:
         out.num_dynamic_combos = read_struct(stream, "i")
         out.flags = read_struct(stream, "I")
         out.centroid_mask = read_struct(stream, "I")
-        out.num_static_combos = read_struct(stream, "I")
+        num_static_combos = read_struct(stream, "I")
+        assert num_static_combos >= 1, f"{num_static_combos=}"
         out.crc = read_struct(stream, "I")
-        # reversed from: "fxc/tonemap_overlay_ps40.vcs" (12KB)
-        # NOTE: number of unknowns probably varies from file to file
-        unknown_1 = read_struct(stream, "I")  # 0x00
-        assert unknown_1 == 0x00, f"{unknown_1=}"
-        some_offset = read_struct(stream, "I")
-        assert some_offset >= 0x30, f"{some_offset=}"
-        if some_offset > 0x30:
-            extras = some_offset - 0x30
-            assert extras % 4 == 0
-            out.unknown_2 = read_struct(stream, f"{extras // 4}I")
-        print(f"0x{stream.tell():02X}")
-        assert read_struct(stream, "i") == -1  # section terminator?
-        out.filesize = read_struct(stream, "I")
-        out.unknown_3 = read_struct(stream, "I")  # 0x00
-        assert out.unknown_3 == 0x00, f"{out.unknown_3=}"
-        out.unknown_4 = read_struct(stream, "I")  # 0x8C280080
-        assert (out.unknown_4 & 0x80000000) != 0, f"{out.unknown_4=}"
-        # attempt to parse shaders
-        # {print(f"{k:<24} | {v}") for k, v in out.__dict__.items()}
-        combos = f"{out.num_combos=}, {out.num_dynamic_combos=}"
-        assert out.num_dynamic_combos == out.num_combos, combos
-        assert out.flags == 0, f"{out.flags=}"
-        assert out.centroid_mask == 0, f"{out.centroid_mask=}"
-        for i in range(out.num_combos):
-            shader_id, shader_length = read_struct(stream, "2I")
-            assert shader_id == i, f"{shader_id=}, {i=}"
+        out.static_combos = [
+            read_struct(stream, "iI")  # (static_combo_id, offset)
+            for i in range(num_static_combos - 1)]
+        # last static combo is always (-1, filesize)
+        terminator, out.filesize = read_struct(stream, "iI")
+        assert terminator == -1, f"{terminator=}"
+        num_duplicates = read_struct(stream, "I")
+        out.duplicates = [
+            read_struct(stream, "2I")  # (combo_id, source_id)
+            for i in range(num_duplicates)]
+        out.unknown = read_struct(stream, "I")
+        # print("=== meta ===")
+        # print(f"filesize={out.filesize}")
+        # print(f"unknown=0x{out.unknown:08X}")
+        # print(f"num_combos={out.num_combos}")
+        # print(f"num_dynamic_combos={out.num_dynamic_combos}")
+        # print(f"{num_static_combos=}")
+        # print(f"{num_duplicates=}")
+        # print("=== static combos ===")
+        # {
+        #     print(f"{id_:02d} @ 0x{offset:08X}")
+        #     for id_, offset in out.static_combos}
+        # print("=== duplicates ===")
+        # {
+        #     print(f"{combo_id=}, {source_id=}")
+        #     for combo_id, source_id in out.duplicates}
+        # print("=== shaders ===")
+        # parse shaders
+        # NOTE: have yet to find the true shader count
+        i = 0
+        while i < (num_static_combos - 1):
+            shader_id, shader_length = read_struct(stream, "iI")
+            if shader_id == -1:  # skip
+                # NOTE: not recording shader_length
+                # -- could be important metadata
+                # print(f"skipping shader {i} (0x{shader_length:08X})")
+                # xxd(stream, limit=0x20, row=0x10, start=stream.tell())
+                # stream.seek(-0x20, 1)
+                continue
+            # print(f"{shader_id=}, {shader_length=}")
             raw_shader = stream.read(shader_length)
             assert len(raw_shader) == shader_length, "unexpected EOF"
+            assert raw_shader[:4] == b"DXBC", f"bad magic: {raw_shader[:4]}"
             shader = dxbc.DXBC.from_bytes(raw_shader)
-            out.shaders[shader_id] = shader
+            oversize = shader_length - shader.filesize
+            assert oversize == 0, f"{oversize=}"
+            out.shaders.append(shader)
+            i += 1
         # end of file
-        terminator = read_struct(stream, "i")
-        assert terminator == -1, f"{terminator=}"
-        assert stream.tell() == out.filesize
+        tail_length = out.filesize - stream.tell()
+        if tail_length > 4:
+            # xxd(stream, row=0x10, start=stream.tell())
+            raise RuntimeError(f"tail of {tail_length} bytes")
+        else:
+            terminator = read_struct(stream, "i")
+            assert terminator == -1, f"{terminator=}"
         return out
