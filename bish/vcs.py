@@ -13,6 +13,10 @@ from . import dxbc
 # TODO: .vcssubfile (patches?)
 
 
+ShaderKey = Tuple[int, int, int]
+# ^ (combo_id, unknown, shader_id)
+
+
 class VCS:
     """Valve Compiled Shader (Titanfall 1 variant)"""
     num_combos: int
@@ -25,8 +29,8 @@ class VCS:
     filesize: int
     duplicates: List[Tuple[int, int]]
     # ^ [(combo_id, source_id)]
-    unknown: int  # looks like a bit mask?
-    shaders: List[dxbc.DXBC]
+    shaders: List[Tuple[ShaderKey, dxbc.DXBC]]
+    # ^ [(combo_id, unknown, shader_id), shader)]
 
     def __init__(self):
         self.num_combos = 0  # len(self.shaders)
@@ -37,7 +41,6 @@ class VCS:
         self.static_combos = list()
         self.filesize = 0
         self.duplicates = list()
-        self.unknown = 0
         self.shaders = list()
 
     def __repr__(self):
@@ -77,50 +80,35 @@ class VCS:
         out.duplicates = [
             read_struct(stream, "2I")  # (combo_id, source_id)
             for i in range(num_duplicates)]
-        out.unknown = read_struct(stream, "I")
-        # print("=== meta ===")
-        # print(f"filesize={out.filesize}")
-        # print(f"unknown=0x{out.unknown:08X}")
-        # print(f"num_combos={out.num_combos}")
-        # print(f"num_dynamic_combos={out.num_dynamic_combos}")
-        # print(f"{num_static_combos=}")
-        # print(f"{num_duplicates=}")
-        # print("=== static combos ===")
-        # {
-        #     print(f"{id_:02d} @ 0x{offset:08X}")
-        #     for id_, offset in out.static_combos}
-        # print("=== duplicates ===")
-        # {
-        #     print(f"{combo_id=}, {source_id=}")
-        #     for combo_id, source_id in out.duplicates}
-        # print("=== shaders ===")
         # parse shaders
-        # NOTE: have yet to find the true shader count
-        i = 0
-        while i < (num_static_combos - 1):
-            shader_id, shader_length = read_struct(stream, "iI")
-            if shader_id == -1:  # skip
-                # NOTE: not recording shader_length
-                # -- could be important metadata
-                # print(f"skipping shader {i} (0x{shader_length:08X})")
-                # xxd(stream, limit=0x20, row=0x10, start=stream.tell())
-                # stream.seek(-0x20, 1)
-                continue
-            # print(f"{shader_id=}, {shader_length=}")
-            raw_shader = stream.read(shader_length)
-            assert len(raw_shader) == shader_length, "unexpected EOF"
-            assert raw_shader[:4] == b"DXBC", f"bad magic: {raw_shader[:4]}"
-            shader = dxbc.DXBC.from_bytes(raw_shader)
-            oversize = shader_length - shader.filesize
-            assert oversize == 0, f"{oversize=}"
-            out.shaders.append(shader)
-            i += 1
-        # end of file
-        tail_length = out.filesize - stream.tell()
-        if tail_length > 4:
-            # xxd(stream, row=0x10, start=stream.tell())
-            raise RuntimeError(f"tail of {tail_length} bytes")
-        else:
-            terminator = read_struct(stream, "i")
-            assert terminator == -1, f"{terminator=}"
+        gap = out.static_combos[0][1] - stream.tell()
+        assert gap == 0, f"gap between header and shaders of {gap} bytes"
+        next_address = [
+            address
+            for combo_id, address in out.static_combos[1:]]
+        next_address.append(out.filesize)
+        for i, (combo_id, address) in enumerate(out.static_combos):
+            stream.seek(address)
+            unknown = read_struct(stream, "I")  # flags?
+            while stream.tell() < next_address[i]:
+                # header
+                shader_id = read_struct(stream, "I")
+                if shader_id >= 128:
+                    unknown = shader_id
+                    continue  # new block
+                shader_length = read_struct(stream, "I")
+                assert 0 <= shader_id <= 127, "invalid shader_id"
+                # shader
+                raw_shader = stream.read(shader_length)
+                assert len(raw_shader) == shader_length, "unexpected EOF"
+                assert raw_shader[:4] == b"DXBC", f"bad magic: {raw_shader[:4]}"
+                shader = dxbc.DXBC.from_bytes(raw_shader)
+                oversize = shader_length - shader.filesize
+                assert oversize == 0, f"{oversize=}"
+                shader_key = (combo_id, unknown, shader_id)
+                out.shaders.append((shader_key, shader))
+            assert unknown == 0xFFFFFFFF, "block of shaders terminated wrong"
+            overshot = stream.tell() - next_address[i]
+            assert overshot == 0, f"past end of block by {overshot} bytes"
+        assert stream.tell() == out.filesize
         return out
