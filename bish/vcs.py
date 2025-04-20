@@ -6,8 +6,6 @@ import io
 from typing import List, Tuple
 
 from .utils.binary import read_struct
-# from .utils.binary import xxd
-from . import dxbc
 
 
 # TODO: .vcssubfile (patches?)
@@ -29,8 +27,8 @@ class VCS:
     filesize: int
     duplicates: List[Tuple[int, int]]
     # ^ [(combo_id, source_id)]
-    shaders: List[Tuple[ShaderKey, dxbc.DXBC]]
-    # ^ [(combo_id, unknown, shader_id), shader)]
+    shaders: List[Tuple[ShaderKey, bytes]]
+    # ^ [(combo_id, unknown, shader_id), raw_shader)]
 
     def __init__(self):
         self.num_combos = 0  # len(self.shaders)
@@ -101,12 +99,12 @@ class VCS:
                 # shader
                 raw_shader = stream.read(shader_length)
                 assert len(raw_shader) == shader_length, "unexpected EOF"
-                assert raw_shader[:4] == b"DXBC", f"bad magic: {raw_shader[:4]}"
-                shader = dxbc.DXBC.from_bytes(raw_shader)
-                oversize = shader_length - shader.filesize
+                assert raw_shader[:4] == b"DXBC", f"{raw_shader[:4]}"
+                shader_filesize = int.from_bytes(raw_shader[24:28], "little")
+                oversize = shader_length - shader_filesize
                 assert oversize == 0, f"{oversize=}"
                 shader_key = (combo_id, unknown, shader_id)
-                out.shaders.append((shader_key, shader))
+                out.shaders.append((shader_key, raw_shader))
             assert unknown == 0xFFFFFFFF, "block of shaders terminated wrong"
             overshot = stream.tell() - next_address[i]
             assert overshot == 0, f"past end of block by {overshot} bytes"
