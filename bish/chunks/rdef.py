@@ -46,17 +46,31 @@ class ResourceDefinition:
         out.program_type = read_struct(stream, "h")
         out.flags = read_struct(stream, "I")
         creator_offset = read_struct(stream, "I")
-        # struct sizes?
-        unknown = (b"RD11", 60, 24, 32, 40, 36, 12, 0)
-        assert read_struct(stream, "4s7I") == unknown
-        # const buffers
-        stream.seek(start + const_buffer_offset)
-        for i in range(num_const_buffers):
-            out.const_buffers.append(ConstBuffer.from_stream(stream))
+        if out.version == (0, 5):
+            # struct sizes?
+            unknown = read_struct(stream, "4s7I")
+            expected = (b"RD11", 60, 24, 32, 40, 36, 12, 0)
+            assert unknown == expected, f"{unknown}"
+        # fingers crossed we support v4.0 already
+        assert out.version in ((0, 4), (0, 5)), f"v{out.version[0]}.{out.version[1]} unsupported"
         # resource bindings
         stream.seek(start + resource_binding_offset)
-        for i in range(num_resource_bindings):
-            out.resource_bindings.append(ResourceBinding.from_stream(stream))
+        out.resource_bindings = [
+            ResourceBinding.from_stream(stream)
+            for i in range(num_resource_bindings)]
+        # const buffers
+        # NOTE: ConstBuffer.from_stream accepts version as an argument
+        # -- however, it currently get trapped in a loop looking up parents
+        # -- something we need to be avoiding anyway
+        if out.version == (0, 5):  # breaking on v0.4
+            stream.seek(start + const_buffer_offset)
+            out.const_buffers = [
+                ConstBuffer.from_stream(stream)
+                for i in range(num_const_buffers)]
+        else:  # v0.4
+            # good luck buddy
+            out.const_buffer_offset = const_buffer_offset
+            out.num_const_buffers = num_const_buffers
         # creator
         stream.seek(start + creator_offset)
         out.creator = read_str(stream)
