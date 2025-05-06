@@ -6,11 +6,13 @@ from ..utils.binary import read_struct
 
 class Statistics:
     num_instructions: int
+    num_temp_registers: int
+    num_defines: int
     ...
 
     @classmethod
     def from_bytes(cls, raw_chunk: bytes) -> Statistics:
-        assert len(raw_chunk) == 148
+        assert len(raw_chunk) == 148, f"unexpected size: {len(raw_chunk)} bytes"
         return cls.from_stream(io.BytesIO(raw_chunk))
 
     @classmethod
