@@ -83,15 +83,12 @@ class DXBC:
                 for other_offset in chunk_offsets)
             raw_chunk = stream.read(length)
             assert len(raw_chunk) == length
+            setattr(out, f"RAW_{name}", raw_chunk)
             if name in chunks.parser:
                 try:
                     parsed_chunk = chunks.parser[name].from_bytes(raw_chunk)
                     setattr(out, name, parsed_chunk)
-                    setattr(out, f"RAW_{name}", raw_chunk)  # for debugging
                 except Exception as exc:
                     out.loading_errors[name] = exc
-                    setattr(out, name, raw_chunk)
-            else:
-                setattr(out, name, raw_chunk)
         # NOTE: we're closing the stream now, hope we got everything!
         return out
