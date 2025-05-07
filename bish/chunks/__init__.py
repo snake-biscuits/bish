@@ -30,7 +30,7 @@ unsupported_chunks = {
     "OSG1": "Out Signature w/ Stream & MinPrecision",
     "OSG5": "Out Signature (Shader Model 5)",
     "PCSG": "Patch Constant Signature Chunk",
-    "SFIO": "???",
+    "SFI0": "???",
     "SHDR": "Shader (Shader Model 4)",
     "SPDB": "Debug",
     "XHSH": "???"}  # 8 bytes, appears in vertex shaders; hash?
