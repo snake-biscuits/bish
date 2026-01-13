@@ -1,0 +1,63 @@
+[project]
+name = "bish"
+version = "0.1.0"
+description = "Bikkie's Interactive Shader Tool"
+readme = "README.md"
+requires-python=">=3.9"
+license = {file = "LICENSE.txt"}
+keywords = ["DirectX", "shaders", "titanfall", "reSource"]
+
+authors = [
+    {name="snake-biscuits", email="bikkie.dev@gmx.com"}
+]
+
+maintainers = [
+    {name="snake-biscuits", email="bikkie.dev@gmx.com"}
+]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+
+dependencies = [
+    "breki @ git+https://git@github.com/snake-biscuits/breki.git"
+]
+
+
+[project.urls]
+"Homepage" = "https://github.com/snake-biscuits/bish"
+"Repository" = "https://github.com/snake-biscuits/bish"
+# "Changelog" = "https://github.com/snake-biscuits/bish/blob/main/CHANGELOG.md"
+"Bug Reports" = "https://github.com/snake-biscuits/bish/issues"
+"Funding" = "https://ko-fi.com/bikkie"
+
+
+[build-system]
+requires = ["hatchling >= 1.13"]
+build-backend = "hatchling.build"
+
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/bite/*",
+#     "/CHANGELOG.md",
+]
+
+
+[tool.hatch.build.targets.wheel]
+only-packages = true
+
+
+[tool.hatch.metadata]
+allow-direct-references = true
