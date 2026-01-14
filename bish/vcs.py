@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Dict, List, Tuple
 
 import breki
-from breki.files.parsed import parse_first
 from breki.binary import read_struct
+from breki.files.parsed import parse_first
 
 
 # TODO: .vcssubfile (patches?)
@@ -30,7 +30,7 @@ class Vcs(breki.BinaryFile, breki.Archive):
     duplicates: List[Tuple[int, int]]
     # ^ [(combo_id, source_id)]
     entries: Dict[str, Tuple[int, int]]
-    # ^ {"combo_id.unknown.shader_id": (offset, length)}
+    # ^ {"combo_id/unknown/shader_id.fxc": (offset, length)}
 
     def __init__(self, filepath: str, archive=None, code_page=None):
         super().__init__(filepath, archive, code_page)
@@ -42,13 +42,6 @@ class Vcs(breki.BinaryFile, breki.Archive):
     @parse_first
     def namelist(self) -> List[str]:
         return sorted(self.entries.keys())
-
-    @parse_first
-    def read(self, filepath: str) -> bytes:
-        assert filepath in self.entries
-        offset, length = self.entries[filepath]
-        self.stream.seek(offset)
-        return self.stream.read(length)
 
     def parse(self):
         if self.is_parsed:
@@ -84,7 +77,7 @@ class Vcs(breki.BinaryFile, breki.Archive):
                     unknown = shader_id
                     continue  # new block
                 assert 0 <= shader_id <= 127, "invalid shader_id"
-                filename = f"{combo_id:08X}/{unknown:08X}.{shader_id:08X}.fxc"
+                filename = f"{combo_id}/{unknown:08X}/{shader_id}.fxc"
                 length = read_struct(self.stream, "I")
                 offset = self.stream.tell()
                 assert offset + length < self.size, "hit EOF early"
@@ -97,3 +90,14 @@ class Vcs(breki.BinaryFile, breki.Archive):
             overshot = self.stream.tell() - next_address[i]
             assert overshot == 0, f"past end of block by {overshot} bytes"
         assert self.stream.tell() == self.size
+
+    @parse_first
+    def read(self, filepath: str) -> bytes:
+        assert filepath in self.entries
+        offset, length = self.entries[filepath]
+        self.stream.seek(offset)
+        return self.stream.read(length)
+
+    @parse_first
+    def sizeof(self, filepath: str) -> int:
+        return self.entries[filepath][1]

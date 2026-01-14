@@ -1,16 +1,16 @@
 """Bikkie's Interactive Shader tool"""
 __all__ = [
-    "asm", "chunks", "dxbc", "msw", "utils", "vcs",
-    "DXBC", "Msw", "Vcs"]
+    "asm", "chunks", "fxc", "msw", "utils", "vcs",
+    "Fxc", "Msw", "Vcs"]
 
 
 from . import asm
 from . import chunks
-from . import dxbc
+from . import fxc
 from . import msw
 from . import utils
 from . import vcs
 
-from .dxbc import DXBC
+from .fxc import Fxc
 from .msw import Msw
 from .vcs import Vcs
