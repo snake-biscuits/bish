@@ -3,8 +3,9 @@ import enum
 import io
 from typing import List
 
+from breki.binary import read_struct
+
 from . import opcodes
-from ...utils.binary import read_struct
 
 
 class Type(enum.Enum):

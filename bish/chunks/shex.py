@@ -3,8 +3,9 @@ import enum
 import io
 from typing import List, Tuple
 
+from breki.binary import read_struct
+
 from .. import asm
-from ..utils.binary import read_struct
 
 
 class ShaderType(enum.Enum):

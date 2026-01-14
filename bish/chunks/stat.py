@@ -1,7 +1,7 @@
 from __future__ import annotations
 import io
 
-from ..utils.binary import read_struct
+from breki.binary import read_struct
 
 
 class Statistics:

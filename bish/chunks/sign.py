@@ -2,7 +2,7 @@ from __future__ import annotations
 import io
 from typing import List
 
-from ..utils.binary import read_str, read_struct
+from breki.binary import read_str, read_struct
 
 
 class Signature:

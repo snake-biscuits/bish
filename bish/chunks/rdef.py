@@ -3,7 +3,7 @@ import enum
 import io
 from typing import Any, List, Tuple
 
-from ..utils.binary import read_str, read_struct
+from breki.binary import read_str, read_struct
 
 
 # NOTE: lots of ShaderTypes & strings will be parsed more than once

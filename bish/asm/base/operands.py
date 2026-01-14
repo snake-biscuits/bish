@@ -4,7 +4,8 @@ import enum
 import io
 from typing import List, Tuple, Union
 
-from ...utils.binary import read_struct
+from breki.binary import read_struct
+
 from . import tokens
 # from . import opcodes
 

@@ -3,7 +3,8 @@ from __future__ import annotations
 import io
 from typing import List, Union
 
-from ...utils.binary import read_struct
+from breki.binary import read_struct
+
 from . import custom_data
 from . import extensions
 from . import opcodes
