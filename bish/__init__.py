@@ -1,7 +1,7 @@
 """Bikkie's Interactive Shader tool"""
 __all__ = [
     "asm", "chunks", "dxbc", "msw", "utils", "vcs",
-    "DXBC", "Msw", "VCS"]
+    "DXBC", "Msw", "Vcs"]
 
 
 from . import asm
@@ -13,4 +13,4 @@ from . import vcs
 
 from .dxbc import DXBC
 from .msw import Msw
-from .vcs import VCS
+from .vcs import Vcs
