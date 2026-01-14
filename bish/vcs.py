@@ -21,7 +21,7 @@ class VcsHeader(breki.Struct):
     _format = "I2i4I"
 
 
-class Vcs(breki.BinaryFile, breki.archives.base.Archive):
+class Vcs(breki.BinaryFile, breki.Archive):
     """Valve Compiled Shader (Titanfall 1 variant)"""
     exts = ["*.vcs"]
     header: VcsHeader
