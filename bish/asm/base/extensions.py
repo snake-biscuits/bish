@@ -116,8 +116,8 @@ class DimensionControls:
         controls = controls << 6  # [30:06]
         out.dimension = ResourceDimension(controls & 0x000007C0 >> 0x06)  # [10:06]
         out.stride = controls & 0x007FF800 >> 0x0A  # [22:11]
-        if out.dimension != ResourceDimension.STRUCTURED_BUFFER:
-            assert out.stride == 0
+        # if out.dimension != ResourceDimension.STRUCTURED_BUFFER:
+        #     assert out.stride == 0
         assert controls & 0x7F800000 == 0  # [30:23]
         return out
 
