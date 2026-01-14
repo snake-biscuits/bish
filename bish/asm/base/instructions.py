@@ -45,6 +45,10 @@ class FullInstruction:
         else:
             return len(self.custom_data)
 
+    # TODO: as_bytes(self) -> bytes:
+    # TODO: as_tokens(self) -> List[int]:
+    #  out = [self.instruction.as_int()]
+
     @classmethod
     def from_bytes(cls, raw_tokens: bytes) -> FullInstruction:
         out = cls.from_stream(io.BytesIO(raw_tokens))
@@ -107,7 +111,7 @@ class Instruction(tokens.Token):
         out.opcode = opcodes.opcode_for(token & 0x000003FF)  # [10:00]
         out.controls = (token & 0x00FFF800) >> 11  # [32:11]
         out.length = (token & 0x7F000000) >> 24  # [30:24]
-        out.extended = bool((token & 0x80000000) >> 31)  # [31]
+        out.is_extended = bool((token & 0x80000000) >> 31)  # [31]
         # NOTE: you should use custom_data.CustomDataBlock for CUSTOM_DATA
         # -- but you have to parse the opcode first to know it's custom data
         if out.opcode != opcodes.D3D_10_0.CUSTOM_DATA:
