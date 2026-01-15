@@ -1,8 +1,13 @@
+import struct
+from typing import List
+
+# from bish.asm.base import custom_data
+from bish.asm.base import opcodes
+
+
 # TODO: colour (highlighting)
 # -- opcode byte
 # -- instruction segments
-
-
 def r2(fxc, limit=None, start=0):
     """radare 2 inspired assembly bytecode viewer"""
     assert "SHEX" in fxc.chunks
@@ -15,30 +20,62 @@ def r2(fxc, limit=None, start=0):
     limit = start + limit if limit is not None else None
     for i, instruction in enumerate(fxc.SHEX.instructions[start:limit]):
         i = start + i
-        token_length = len(instruction)
-        length = token_length * 4
-        # raw instruction bytes
-        raw = fxc.RAW_SHEX[offset:offset+length]
-        hex_ = raw.hex().upper()
-        padding = (4 - token_length % 4) % 4  # in tokens
-        hex_ = hex_ + " " * 8 * padding
-        hex_ = " ".join(
-            hex_[i:i + 8]
-            for i in range(0, len(hex_), 8))
-        # opcode
+        num_tokens = len(instruction)
+        bytes_length = num_tokens * 4
+
+        raw_tokens = fxc.RAW_SHEX[offset:offset + bytes_length]
+        tokens = struct.unpack(f"{num_tokens}I", raw_tokens)
         opcode = instruction.opcode.name
-        # TODO: operands & other tokens
+        # TODO: group tokens by instruction data instead
 
-        # TODO: split CUSTOM_DATA to better represent mat4x4
-        # TODO: split lines contextually, for each instruction subsection
-        if token_length <= 4:
-            print(f"{i:4} | {offset:04X} | {hex_} | {opcode} ...")
-        else:  # multi-line
-            for j in range((token_length + 3) // 4):
-                sub_hex_ = hex_[j*36:(j+1)*36-1]
-                sub_offset = offset + j * 16
-                i_s = f"{i:4}" if j == 0 else " " * 4
-                tail = f"{opcode} ..." if j == 0 else ""
-                print(f"{i_s} | {sub_offset:04X} | {sub_hex_} | {tail}")
+        # TODO: better extension & operand reprs
+        token_groups = list()
+        if not opcode.startswith("DCL_"):
+            token_offset = 1
+            for extension in instruction.extensions:
+                sub_tokens = tokens[token_offset:token_offset+1]
+                tail = f"  {extension.type.name} ..."
+                token_groups.append((sub_tokens, tail))
+                token_offset += 1
+            if not all(isinstance(o, int) for o in instruction.operands):
+                for operand in instruction.operands:
+                    sub_tokens = tokens[token_offset:token_offset+len(operand)]
+                    tail = f"  {operand}"
+                    token_groups.append((sub_tokens, tail))
+                    token_offset += len(operand)
+            if len(tokens) > token_offset:
+                token_groups.append((tokens[token_offset:], ""))
 
-        offset += length
+        if instruction.opcode == opcodes.D3D_10_0.CUSTOM_DATA:
+            print_tokens(offset, tokens[:2], f"{i:4}", opcode)
+            print_tokens(offset + 8, tokens[2:])
+        # TODO: lines for extensions & opcodes
+        elif len(token_groups) > 0:
+            print_tokens(offset, tokens[:1], f"{i:4}", opcode)
+            sub_offset = offset + 4
+            for group, tail in token_groups:
+                print_tokens(sub_offset, group, tail=tail)
+                sub_offset += len(group) * 4
+        else:  # basic print
+            print_tokens(offset, tokens, f"{i:4}", opcode)
+
+        offset += bytes_length
+
+
+def line_for(offset: int, tokens: List[int], head=" "*4, tail="") -> str:
+    tokens = [f"{token:08X}" for token in tokens]
+    if len(tokens) < 4:
+        tokens.extend([" " * 8] * (4 - len(tokens)))
+    assert len(tokens) == 4
+    hex_ = " ".join(tokens)
+    return f"{head} | {offset:04X} | {hex_} | {tail}"
+
+
+def print_tokens(offset: int, tokens: List[int], head=" "*4, tail=""):
+    for i in range(0, len(tokens), 4):
+        sub_tokens = tokens[i:i + 4]
+        print(line_for(offset, sub_tokens, head, tail))
+        offset += 16
+        # clear head & tail after first line
+        head = " " * 4
+        tail = ""

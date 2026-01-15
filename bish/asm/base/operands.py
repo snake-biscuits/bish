@@ -37,6 +37,13 @@ class FullOperand:
         descriptor = f"{self.swizzle_str()} {len(self.indices)} indices"
         return f"<{self.__class__.__name__} {descriptor} @ 0x{id(self):016X}>"
 
+    def __str__(self) -> str:
+        out = f"{register_name(self.type, self.indices)}"
+        swizzle_str = self.swizzle_str()
+        if swizzle_str is not None:
+            out += swizzle_str.lower()
+        return out
+
     def __len__(self) -> int:
         num_index_tokens = 0
         for i, index_repr in enumerate(self.index_representations):
@@ -214,6 +221,26 @@ class Type(enum.Enum):
     OUTPUT_DEPTH_GREATER_EQUAL = 0x26
     OUTPUT_DEPTH_LESS_EQUAL = 0x27
     CYCLE_COUNTER = 0x28
+
+
+def register_name(type_: Type, indices) -> str:
+    chars = {
+        Type.CONSTANT_BUFFER: "cb",
+        Type.INPUT: "v",  # vertex attribute (in a pixel shader)
+        Type.RESOURCE: "t",  # texture (in a SAMPLE call)
+        Type.SAMPLER: "s",  # texture sampler register
+        Type.TEMP: "r",  # temp register
+    }
+    if len(indices) == 1:
+        index = indices[0][0]  # IMM, not REL
+        return f"{chars.get(type_, type_.name + ' ')}{index}"
+    elif len(indices) == 2 and type_ == Type.CONSTANT_BUFFER:
+        # assuming DCL_CONSTANT_BUFFER w/ immediateIndexed AccessPattern
+        return f"cb{indices[0][0]}[{indices[1][0]}]"
+    # TODO: IMMEDIATE_32 w/ no indices
+    else:
+        print(f"{type_.name}: {indices=}")
+        raise RuntimeError()
 
 
 class IndexRepresentation(enum.Enum):
