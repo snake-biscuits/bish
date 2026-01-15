@@ -64,16 +64,16 @@ def r2(fxc, limit=None, start=0):
 
 def line_for(offset: int, tokens: List[int], head=" "*4, tail="") -> str:
     tokens = [f"{token:08X}" for token in tokens]
-    if len(tokens) < 4:
-        tokens.extend([" " * 8] * (4 - len(tokens)))
-    assert len(tokens) == 4
+    if len(tokens) < 5:
+        tokens.extend([" " * 8] * (5 - len(tokens)))
+    assert len(tokens) == 5
     hex_ = " ".join(tokens)
     return f"{head} | {offset:04X} | {hex_} | {tail}"
 
 
 def print_tokens(offset: int, tokens: List[int], head=" "*4, tail=""):
-    for i in range(0, len(tokens), 4):
-        sub_tokens = tokens[i:i + 4]
+    for i in range(0, len(tokens), 5):
+        sub_tokens = tokens[i:i + 5]
         print(line_for(offset, sub_tokens, head, tail))
         offset += 16
         # clear head & tail after first line

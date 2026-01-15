@@ -2,6 +2,7 @@
 from __future__ import annotations
 import enum
 import io
+import struct
 from typing import List, Tuple, Union
 
 from breki.binary import read_struct
@@ -34,13 +35,15 @@ class FullOperand:
         self.indices = list()
 
     def __repr__(self) -> str:
+        # TODO: 4x Immediate Values
         descriptor = f"{self.swizzle_str()} {len(self.indices)} indices"
         return f"<{self.__class__.__name__} {descriptor} @ 0x{id(self):016X}>"
 
     def __str__(self) -> str:
+        # TODO: 4x Immediate Values
         out = f"{register_name(self.type, self.indices)}"
         swizzle_str = self.swizzle_str()
-        if swizzle_str is not None:
+        if swizzle_str not in (None, "."):
             out += swizzle_str.lower()
         return out
 
@@ -83,6 +86,13 @@ class FullOperand:
         out.name = operand.name
         out.index_representations = operand.index_representations
         assert not operand.is_extended, "Extended Operand Not Yet Implemented"
+        if out.type == Type.IMMEDIATE_32:
+            out.index_representations = [IndexRepresentation.IMM32]
+            # 4x immediate values
+            if out.selection_mode == SelectionMode.MASK and out.mask == Mask(0):
+                out.index_representations *= 4
+        elif out.type == Type.IMMEDIATE_64:
+            out.index_representations = [IndexRepresentation.IMM64]
         for index_repr in out.index_representations:
             imm, rel = None, None
             if index_repr.name.startswith("IMM32"):
@@ -231,13 +241,20 @@ def register_name(type_: Type, indices) -> str:
         Type.SAMPLER: "s",  # texture sampler register
         Type.TEMP: "r",  # temp register
     }
+    if type_ in (Type.IMMEDIATE_32, Type.IMMEDIATE_64):
+        out = list()
+        for imm, rel in indices:
+            float_val = struct.unpack("f", imm.to_bytes(4, "little"))[0]
+            # out.append(f"0x{imm:08X} ({float_val:.06f})")
+            out.append(f"{float_val:.06f}")
+        return f'({", ".join(out)})'
+    # TODO: IMMEDIATE_CONSTANT_BUFFER
     if len(indices) == 1:
         index = indices[0][0]  # IMM, not REL
         return f"{chars.get(type_, type_.name + ' ')}{index}"
     elif len(indices) == 2 and type_ == Type.CONSTANT_BUFFER:
         # assuming DCL_CONSTANT_BUFFER w/ immediateIndexed AccessPattern
         return f"cb{indices[0][0]}[{indices[1][0]}]"
-    # TODO: IMMEDIATE_32 w/ no indices
     else:
         print(f"{type_.name}: {indices=}")
         raise RuntimeError()
