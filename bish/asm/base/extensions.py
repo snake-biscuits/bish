@@ -1,6 +1,7 @@
 # https://github.com/tpn/winsdk-10/blob/master/Include/10.0.10240.0/um/d3d11TokenizedProgramFormat.hpp#L520
 from __future__ import annotations
 import enum
+import functools
 from typing import Union
 
 from . import tokens
@@ -39,6 +40,13 @@ class Extension(tokens.Token):
             f"is_extended={self.is_extended}"])
         return f"{self.__class__.__name__}({args})"
 
+    def as_token(self) -> int:
+        return functools.reduce(
+            lambda a, b: a | b, [
+                self.type.value << 0,
+                self.controls.as_int() << 6,
+                int(self.is_extended) << 31])
+
     @classmethod
     def from_token(cls, token: int) -> Extension:
         out = cls()
@@ -65,6 +73,9 @@ class SampleControls:
             f"{attr}={getattr(self, attr)}"
             for attr in ("u_offset", "v_offset", "w_offset")])
         return f"{self.__class__.__name__}({args})"
+
+    def as_int(self) -> int:
+        raise NotImplementedError()
 
     @classmethod
     def from_controls(cls, controls: int) -> SampleControls:
@@ -110,6 +121,9 @@ class DimensionControls:
             f"stride={self.stride}"])
         return f"{self.__class__.__name__}({args})"
 
+    def as_int(self) -> int:
+        ...
+
     @classmethod
     def from_controls(cls, controls: int) -> SampleControls:
         out = cls()
@@ -150,6 +164,14 @@ class ReturnControls:
     def __repr__(self) -> str:
         args = f"x={self.x}, y={self.y}, z={self.z}, w={self.w}"
         return f"{self.__class__.__name__}({args})"
+
+    def as_int(self) -> int:
+        return functools.reduce(
+            lambda a, b: a | b, [
+                self.x.value << 0x00,
+                self.y.value << 0x04,
+                self.z.value << 0x08,
+                self.w.value << 0x0C])
 
     @classmethod
     def from_controls(cls, controls: int) -> SampleControls:

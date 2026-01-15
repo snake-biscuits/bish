@@ -1,5 +1,6 @@
 # https://github.com/tpn/winsdk-10/blob/master/Include/10.0.10240.0/um/d3d11TokenizedProgramFormat.hpp
 from __future__ import annotations
+import functools
 import io
 from typing import List, Union
 
@@ -8,7 +9,7 @@ from breki.binary import read_struct
 from . import custom_data
 from . import extensions
 from . import opcodes
-# from . import operands
+from . import operands
 from . import tokens
 
 
@@ -46,8 +47,17 @@ class FullInstruction:
             return len(self.custom_data)
 
     # TODO: as_bytes(self) -> bytes:
-    # TODO: as_tokens(self) -> List[int]:
-    #  out = [self.instruction.as_int()]
+
+    def as_tokens(self) -> List[int]:
+        return [
+            self.instruction.as_int(),
+            *[
+                extension.as_int()
+                for extension in self.extensions],
+            # *[
+            #     operand.as_tokens()
+            #     for operand in self.operands]]
+            *self.operands]
 
     @classmethod
     def from_bytes(cls, raw_tokens: bytes) -> FullInstruction:
@@ -58,6 +68,7 @@ class FullInstruction:
     @classmethod
     def from_stream(cls, stream: io.BytesIO) -> FullInstruction:
         out = cls()
+        # instruction
         token = read_struct(stream, "I")
         out.instruction = Instruction.from_token(token)
         out.opcode = out.instruction.opcode
@@ -65,16 +76,28 @@ class FullInstruction:
             assert not out.instruction.is_extended
             stream.seek(-4, 1)  # go back 1 token
             out.custom_data = custom_data.CustomDataBlock.from_stream(stream)
-            # TODO: confirm CustomDataBlock has no operands
+            # TODO: confirm CustomDataBlock consumes full length
             return out
+        # extensions
         prev_token = out.instruction
         while prev_token.is_extended:
             prev_token = extensions.Extension.from_stream(stream)
             out.extensions.append(prev_token)
-        num_operands = out.instruction.length - len(out.extensions) - 1
-        for i in range(num_operands):
-            # TODO: use operand class, can consume multiple tokens
-            out.operands.append(read_struct(stream, "I"))
+        # operands
+        num_operand_tokens = out.instruction.length - len(out.extensions) - 1
+        operand_tokens = [
+            read_struct(stream, "I")
+            for i in range(num_operand_tokens)]
+        # NOTE: DCL_* operands use a different format
+        try:
+            offset = 0
+            while offset < num_operand_tokens:
+                operand = operands.FullOperand.from_tokens(operand_tokens[offset:])
+                offset += len(operand)
+                out.operands.append(operand)
+        except Exception:
+            # NOTE: silencing errors like this is bad practice
+            out.operands = operand_tokens
         return out
 
 
@@ -91,8 +114,6 @@ class Instruction(tokens.Token):
         self.is_extended = is_extended
 
     def __repr__(self) -> str:
-        # descriptor = f"(0x{self.opcode.value:02X}) {self.opcode.name}"
-        # return f"<{self.__class__.__name__} {descriptor} @ 0x{id(self):016X}>"
         args = ", ".join([
             f"{self.opcode.__class__.__name__}.{self.opcode.name}",
             f"controls={self.controls}",
@@ -103,7 +124,12 @@ class Instruction(tokens.Token):
     def as_int(self) -> int:
         assert 0 <= self.controls <= 0x1FFF
         assert 0 <= self.length <= 0x7F
-        return (self.opcode.value << 0) | (self.controls << 11) | (self.length << 24) | (int(self.is_extended) << 31)
+        return functools.reduce(
+            lambda a, b: a | b, [
+                self.opcode.value << 0,
+                self.controls << 11,
+                self.length << 24,
+                int(self.is_extended) << 31])
 
     @classmethod
     def from_token(cls, token: int) -> Instruction:
